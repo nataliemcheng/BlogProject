@@ -1,35 +1,50 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 using BlogProject.Data;
 using BlogProject.Models;
-using BlogProject.Areas.Identity.Data;
+using BlogProject.Services;
+using System.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-//builder.Services.AddDbContext<ApplicationDbContext>(options =>
-//    options.UseSqlite(connectionString));
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-//builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true).AddEntityFrameworkStores<BlogProjectIdentityDbContext>();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
-//builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
-//    .AddEntityFrameworkStores<ApplicationDbContext>();
 
 builder.Services.AddIdentity<BlogUser, IdentityRole>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddDefaultUI()
     .AddDefaultTokenProviders()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages().AddRazorRuntimeCompilation();
 
+// Register custom DataService class
+builder.Services.AddScoped<DataService>();
+
+// Register a preconfigured instance of the MailSettings clas
+builder.Services.Configure<BlogProject.ViewModels.MailSettings>(builder.Configuration.GetSection("MailSettings"));
+builder.Services.AddScoped<IBlogEmailSender, EmailService>();
+
+// Register Image Service
+builder.Services.AddScoped<IImageService, BasicImageService>();
+
+// Register Slug Service
+builder.Services.AddScoped<ISlugService, BasicSlugService>();
+
+
 var app = builder.Build();
+
+//pull out registered DataService
+var dataService = app.Services
+                     .CreateScope().ServiceProvider
+                     .GetRequiredService<DataService>();
+
+await dataService.ManageDataAsync();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -56,4 +71,3 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
-
